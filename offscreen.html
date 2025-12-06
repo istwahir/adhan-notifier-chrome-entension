@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Offscreen Audio</title>
+    <style>
+        /* Keep offscreen lightweight; apply minimal theming for consistency */
+        body { margin: 0; background: #0b1320; color: #f8fafc; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+    </style>
+    <meta name="color-scheme" content="dark light">
+  </head>
+<body>
+    <span class="sr-only" aria-live="polite">Adhan audio offscreen context</span>
+    <audio id="adhanAudio" src="adhan.mp3"></audio>
+    <script src="offscreen.js"></script>
+</body>
+</html>

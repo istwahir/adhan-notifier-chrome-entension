@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Adhan Notifier</title>
+    <!-- Google Fonts: Roboto + Noto Sans Arabic -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Noto+Sans+Arabic:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --emerald: #0f766e; /* deep emerald */
+            --emerald-700: #0a4f4a;
+            --royal-blue: #1e3a8a;
+            --gold: #d4af37;
+            --soft-white: #f8fafc;
+            --ink: #0b1320;
+            --muted: #64748b;
+            --shadow: 0 10px 25px rgba(11, 19, 32, 0.25);
+            --radius: 14px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Roboto', 'Noto Sans Arabic', system-ui, -apple-system, Segoe UI, sans-serif;
+            width: 320px;
+            margin: 0;
+            padding: 0;
+            color: var(--soft-white);
+            background: linear-gradient(180deg, var(--royal-blue), var(--emerald));
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Subtle geometric Islamic pattern using SVG bg */
+        body::before {
+            content: "";
+            position: absolute; inset: 0;
+            background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+            background-size: 24px 24px;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .container {
+            display: flex; flex-direction: column; gap: 12px;
+            padding: 16px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(212,175,55,0.25);
+            backdrop-filter: blur(6px);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 14px;
+        }
+
+        .header {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 8px;
+        }
+        .crescent {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, var(--gold) 0%, #fff0 60%),
+                        radial-gradient(circle at 55% 50%, rgba(0,0,0,0.0) 30%, rgba(0,0,0,0.5) 31%);
+            box-shadow: 0 2px 8px rgba(212,175,55,0.3);
+        }
+        h3 {
+            font-weight: 700; letter-spacing: 0.2px; margin: 0;
+        }
+
+        .grid {
+            display: grid; grid-template-columns: 1fr; gap: 10px;
+        }
+        @media (min-width: 360px) {
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        label { font-size: 12px; color: #e2e8f0; }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.08);
+            color: var(--soft-white);
+            outline: none;
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+        input[type="text"]::placeholder { color: #cbd5e1; }
+        input[type="text"]:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(212,175,55,0.25); }
+
+        .actions {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px;
+        }
+        button {
+            flex: 1 1 auto;
+            padding: 10px 12px;
+            border: none; border-radius: 10px;
+            cursor: pointer; color: var(--ink);
+            background: linear-gradient(180deg, #f8e7b6, var(--gold));
+            box-shadow: 0 6px 14px rgba(212,175,55,0.35);
+            transition: transform 120ms ease, box-shadow 160ms ease, filter 120ms ease;
+        }
+        button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+        button:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(212,175,55,0.35); }
+        button#geoBtn {
+            background: linear-gradient(180deg, #a7f3d0, #34d399);
+            box-shadow: 0 6px 14px rgba(52,211,153,0.35);
+        }
+
+        #prayerTimes {
+            margin-top: 8px;
+            display: grid; gap: 6px;
+        }
+        .timeItem {
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 10px;
+            padding: 8px 10px;
+        }
+        .timeItem .name { font-weight: 600; }
+        .timeItem .value { color: #e2e8f0; }
+
+        /* Accessibility & motion */
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; animation: none !important; }
+        }
+    </style>
+    <meta name="color-scheme" content="dark light">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="crescent" aria-hidden="true"></div>
+            <h3>Adhan Notifier</h3>
+        </div>
+        <div class="card">
+            <div class="grid" role="group" aria-label="Location inputs">
+                <div>
+                    <label for="city">City</label>
+                    <input type="text" id="city" placeholder="Enter city" autocomplete="address-level2">
+                </div>
+                <div>
+                    <label for="country">Country</label>
+                    <input type="text" id="country" placeholder="Enter country" autocomplete="address-level1">
+                </div>
+            </div>
+            <div class="actions">
+                <button id="manualBtn" aria-label="Set location manually">Set Location</button>
+                <button id="geoBtn" aria-label="Use current location">Use Current Location</button>
+            </div>
+        </div>
+        <div id="prayerTimes" aria-live="polite" aria-atomic="true"></div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
