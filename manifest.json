@@ -11,7 +11,8 @@
     "offscreen"
   ],
   "host_permissions": [
-    "https://api.aladhan.com/*"
+    "https://api.aladhan.com/*",
+    "https://hadithapi.com/*"
   ],
   "background": {
     "service_worker": "background.js"

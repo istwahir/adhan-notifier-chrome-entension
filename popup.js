@@ -4,9 +4,59 @@ document.addEventListener('DOMContentLoaded', function() {
     const manualBtn = document.getElementById('manualBtn');
     const geoBtn = document.getElementById('geoBtn');
     const prayerTimesDiv = document.getElementById('prayerTimes');
+    const adhanNotification = document.getElementById('adhanNotification');
+    const audioToggle = document.getElementById('audioToggle');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const playIcon = document.getElementById('playIcon');
+    const adhanPrayerName = document.getElementById('adhanPrayerName');
+    
     let currentTimings = null;
     let currentLocation = null;
     let updateTimer = null;
+    let isAudioPlaying = false;
+
+    // Audio control toggle
+    if (audioToggle) {
+        audioToggle.addEventListener('click', function() {
+            if (isAudioPlaying) {
+                // Pause audio
+                chrome.runtime.sendMessage({ action: 'pauseAdhan' }, (resp) => {
+                    if (resp && resp.paused) {
+                        isAudioPlaying = false;
+                        pauseIcon.style.display = 'none';
+                        playIcon.style.display = 'block';
+                        audioToggle.setAttribute('aria-label', 'Resume adhan');
+                        audioToggle.setAttribute('title', 'Resume');
+                    }
+                });
+            } else {
+                // Resume audio
+                chrome.runtime.sendMessage({ action: 'resumeAdhan' }, (resp) => {
+                    if (resp && resp.resumed) {
+                        isAudioPlaying = true;
+                        pauseIcon.style.display = 'block';
+                        playIcon.style.display = 'none';
+                        audioToggle.setAttribute('aria-label', 'Pause adhan');
+                        audioToggle.setAttribute('title', 'Pause');
+                    }
+                });
+            }
+        });
+    }
+
+    // Listen for adhan start/end messages from background
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.action === 'adhanStarted') {
+            isAudioPlaying = true;
+            adhanPrayerName.textContent = `${message.prayer || 'Adhan'} Time`;
+            adhanNotification.classList.add('active');
+            pauseIcon.style.display = 'block';
+            playIcon.style.display = 'none';
+        } else if (message.action === 'adhanEnded') {
+            isAudioPlaying = false;
+            adhanNotification.classList.remove('active');
+        }
+    });
 
     // Load stored data (location + today's timings) and render
     chrome.storage.local.get(['location', 'prayerTimes', 'date'], function(result) {
@@ -19,6 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
             renderView();
         }
     });
+
+    // Load Hadith of the Day
+    loadHadith();
 
     manualBtn.addEventListener('click', function() {
         const city = cityInput.value.trim();
@@ -86,6 +139,8 @@ document.addEventListener('DOMContentLoaded', function() {
         currentTimings = timings;
         renderView();
         startAutoUpdate();
+        // Reschedule alarms with new timings
+        try { chrome.runtime.sendMessage({ action: 'reschedule' }); } catch (e) { /* noop */ }
     }
 
     function renderView() {
@@ -187,5 +242,91 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function escapeHtml(str) {
         return String(str).replace(/[&<>"]/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+    }
+    function loadHadith() {
+        const hadithContent = document.getElementById('hadithContent');
+        const today = new Date().toDateString();
+        // Local fallback Hadiths (short, widely cited). Used if network errors or API changes occur.
+        const fallbackHadiths = [
+            {
+                text: 'The most beloved deeds to Allah are those that are most consistent, even if small.',
+                source: 'Sahih al-Bukhari',
+                narrator: 'Aisha (ra)'
+            },
+            {
+                text: 'Indeed, actions are but by intentions, and every person will get the reward according to what he intended.',
+                source: 'Sahih al-Bukhari & Muslim',
+                narrator: 'Umar ibn al-Khattab (ra)'
+            },
+            {
+                text: 'The best of you are those who learn the Qur’an and teach it.',
+                source: 'Sahih al-Bukhari',
+                narrator: 'Uthman ibn Affan (ra)'
+            },
+            {
+                text: 'Make things easy, do not make them difficult; cheer the people up by conveying glad tidings to them and do not repulse them.',
+                source: 'Sahih al-Bukhari',
+                narrator: 'Anas ibn Malik (ra)'
+            }
+        ];
+
+        chrome.storage.local.get(['hadith', 'hadithDate'], function(result) {
+            if (result.hadith && result.hadithDate === today) {
+                displayHadith(result.hadith);
+            } else {
+                fetchHadith();
+            }
+        });
+
+        function fetchHadith() {
+            // Ask background to fetch from hadith.gading.dev (no API key needed)
+            // Rotate through collections: bukhari, muslim, tirmidzi, abudawud
+            const books = ['bukhari', 'muslim', 'tirmidzi', 'abudawud'];
+            const randomBook = books[Math.floor(Math.random() * books.length)];
+            
+            chrome.runtime.sendMessage({ action: 'fetchHadith', book: randomBook }, (resp) => {
+                if (!resp || !resp.success) {
+                    // console.warn('Hadith fetch via background failed:', resp?.error);
+                    return useFallback();
+                }
+                const data = resp.data;
+                // hadith.gading.dev single hadith returns { data: { number, arab, id, ... } }
+                const h = data?.data;
+                if (!h) {
+                    console.warn('No hadith data in response');
+                    return useFallback();
+                }
+                // Try to get English text; if not available, use Arab text as placeholder
+                const text = h?.arab || h?.text || 'Hadith text';
+                const source = data?.data?.name || randomBook.charAt(0).toUpperCase() + randomBook.slice(1);
+                const narrator = `Hadith ${h?.number || h?.id || ''}`;
+                
+                const hadith = { text, source, narrator };
+                chrome.storage.local.set({ hadith, hadithDate: today });
+                // Log to console for debugging/visibility
+                console.log('Hadith (today):', hadith);
+                displayHadith(hadith);
+            });
+        }
+
+        function useFallback() {
+            const pick = fallbackHadiths[Math.floor(Math.random() * fallbackHadiths.length)];
+            chrome.storage.local.set({ hadith: pick, hadithDate: today });
+            console.log('Hadith (fallback):', pick);
+            displayHadith(pick);
+        }
+
+        function displayHadith(hadith) {
+            if (hadith) {
+                hadithContent.innerHTML = `
+                    <blockquote style="margin: 0; font-style: italic; color: #e2e8f0;">"${escapeHtml(hadith.text)}"</blockquote>
+                    <cite style="display: block; margin-top: 8px; font-size: 12px; color: #cbd5e1;">
+                        — ${escapeHtml(hadith.narrator)}, ${escapeHtml(hadith.source)}
+                    </cite>
+                `;
+            } else {
+                hadithContent.innerHTML = '<p style="color: #cbd5e1; font-size: 14px;">Unable to load Hadith. Please check your connection.</p>';
+            }
+        }
     }
 });

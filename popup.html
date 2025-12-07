@@ -56,6 +56,11 @@
             padding: 14px;
         }
 
+        .title {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            margin-bottom: 8px;
+        }
+
         .header {
             display: flex; align-items: center; gap: 10px;
             margin-bottom: 8px;
@@ -124,6 +129,52 @@
         .timeItem .name { font-weight: 600; }
         .timeItem .value { color: #e2e8f0; }
 
+        /* Adhan notification banner */
+        #adhanNotification {
+            display: none; /* Hidden by default */
+            background: linear-gradient(135deg, rgba(15,118,110,0.95), rgba(30,58,138,0.95));
+            border: 2px solid var(--gold);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            box-shadow: 0 12px 28px rgba(212,175,55,0.45);
+            animation: slideIn 0.3s ease-out;
+        }
+        #adhanNotification.active { display: flex; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .adhan-content {
+            flex: 1;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .adhan-title {
+            font-weight: 700; font-size: 16px; color: var(--gold);
+            display: flex; align-items: center; gap: 6px;
+        }
+        .adhan-message {
+            font-size: 13px; color: #e2e8f0;
+        }
+        .audio-control {
+            display: flex; align-items: center; justify-content: center;
+            width: 40px; height: 40px; margin-left: 12px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(212,175,55,0.4);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 160ms ease;
+        }
+        .audio-control:hover {
+            background: rgba(212,175,55,0.3);
+            transform: scale(1.05);
+        }
+        .audio-control:active {
+            transform: scale(0.95);
+        }
+        .audio-control svg {
+            width: 20px; height: 20px; fill: var(--soft-white);
+        }
+
         /* Accessibility & motion */
         @media (prefers-reduced-motion: reduce) {
             * { transition: none !important; animation: none !important; }
@@ -133,9 +184,36 @@
 </head>
 <body>
     <div class="container">
+        <!-- Adhan notification banner (appears when adhan is playing) -->
+        <div id="adhanNotification" role="alert" aria-live="assertive">
+            <div class="adhan-content">
+                <div class="adhan-title">
+                    <span>🕌</span>
+                    <span id="adhanPrayerName">Adhan Time</span>
+                </div>
+                <div class="adhan-message">Playing adhan audio...</div>
+            </div>
+            <button class="audio-control" id="audioToggle" aria-label="Pause adhan" title="Pause">
+                <!-- Pause icon (default) -->
+                <svg id="pauseIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                </svg>
+                <!-- Play icon (hidden initially) -->
+                <svg id="playIcon" style="display:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+            </button>
+        </div>
+        
         <div class="header">
             <div class="crescent" aria-hidden="true"></div>
             <h3>Adhan Notifier</h3>
+        </div>
+         <div class="card" id="hadithCard">
+            <h4 class="title">Hadith of the Day</h4>
+            <div id="hadithContent">
+                <p>Loading Hadith...</p>
+            </div>
         </div>
         <div class="card">
             <div class="grid" role="group" aria-label="Location inputs">
@@ -154,6 +232,7 @@
             </div>
         </div>
         <div id="prayerTimes" aria-live="polite" aria-atomic="true"></div>
+       
     </div>
     <script src="popup.js"></script>
 </body>

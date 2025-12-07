@@ -2,9 +2,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('settingsForm');
     const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
     const playAudioCheckbox = document.getElementById('playAudio');
+    const hadithApiKeyInput = document.getElementById('hadithApiKey');
 
     // Load settings
-    chrome.storage.local.get(['enabledPrayers', 'playAudio'], function(result) {
+    chrome.storage.local.get(['enabledPrayers', 'playAudio', 'hadithApiKey'], function(result) {
         const enabled = result.enabledPrayers || ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
         prayers.forEach(prayer => {
             const checkbox = document.getElementById(prayer);
@@ -14,6 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         if (result.playAudio) {
             playAudioCheckbox.checked = true;
+        }
+        // Avoid logging API key; just populate the masked field if present
+        if (hadithApiKeyInput && typeof result.hadithApiKey === 'string' && result.hadithApiKey.length > 0) {
+            hadithApiKeyInput.value = result.hadithApiKey;
         }
     });
 
@@ -27,9 +32,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         const playAudio = playAudioCheckbox.checked;
+        const hadithApiKey = hadithApiKeyInput ? hadithApiKeyInput.value.trim() : '';
+        // Store locally (not synced). Do not log or expose the key.
         chrome.storage.local.set({
             enabledPrayers: enabledPrayers,
-            playAudio: playAudio
+            playAudio: playAudio,
+            hadithApiKey: hadithApiKey
         }, function() {
             alert('Settings saved!');
             // Reschedule prayers
