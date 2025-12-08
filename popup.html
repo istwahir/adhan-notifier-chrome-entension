@@ -157,10 +157,9 @@
         }
         .audio-control {
             display: flex; align-items: center; justify-content: center;
-            width: 40px; height: 40px; margin-left: 12px;
+            width: 28px; height: 28px; margin-left: 12px;
             background: rgba(255,255,255,0.15);
             border: 1px solid rgba(212,175,55,0.4);
-            border-radius: 50%;
             cursor: pointer;
             transition: all 160ms ease;
         }
@@ -173,6 +172,24 @@
         }
         .audio-control svg {
             width: 20px; height: 20px; fill: var(--soft-white);
+        }
+        .close-control {
+            display: flex; align-items: center; justify-content: center;
+            width: 28px; height: 28px; margin-left: 8px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            cursor: pointer;
+            transition: all 160ms ease;
+        }
+        .close-control:hover {
+            background: rgba(239, 68, 68, 0.3);
+            transform: scale(1.05);
+        }
+        .close-control:active {
+            transform: scale(0.95);
+        }
+        .close-control svg {
+            width: 18px; height: 18px; fill: #fca5a5;
         }
 
         /* Accessibility & motion */
@@ -191,7 +208,6 @@
                     <span>🕌</span>
                     <span id="adhanPrayerName">Adhan Time</span>
                 </div>
-                <div class="adhan-message">Playing adhan audio...</div>
             </div>
             <button class="audio-control" id="audioToggle" aria-label="Pause adhan" title="Pause">
                 <!-- Pause icon (default) -->
@@ -201,6 +217,12 @@
                 <!-- Play icon (hidden initially) -->
                 <svg id="playIcon" style="display:none;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z"/>
+                </svg>
+            </button>
+            <button class="close-control" id="closeAdhan" aria-label="Stop and close adhan" title="Stop">
+                <!-- Close/X icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                 </svg>
             </button>
         </div>
@@ -214,6 +236,9 @@
             <div id="hadithContent">
                 <p>Loading Hadith...</p>
             </div>
+        </div>
+        <div class="card">
+            <button id="playAdhanBtn" style="width: 100%;">🔊 Play Adhan</button>
         </div>
         <div class="card">
             <div class="grid" role="group" aria-label="Location inputs">

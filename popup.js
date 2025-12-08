@@ -9,11 +9,53 @@ document.addEventListener('DOMContentLoaded', function() {
     const pauseIcon = document.getElementById('pauseIcon');
     const playIcon = document.getElementById('playIcon');
     const adhanPrayerName = document.getElementById('adhanPrayerName');
+    const closeAdhan = document.getElementById('closeAdhan');
     
     let currentTimings = null;
     let currentLocation = null;
     let updateTimer = null;
     let isAudioPlaying = false;
+
+    // Check if adhan is currently playing when popup opens
+    checkAdhanState();
+
+    function checkAdhanState() {
+        chrome.runtime.sendMessage({ action: 'getAudioState' }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.log('Could not get audio state:', chrome.runtime.lastError.message);
+                return;
+            }
+            if (response && response.isPlaying) {
+                console.log('Adhan is currently playing, restoring banner');
+                // Get current prayer name from storage
+                chrome.storage.local.get(['currentPrayer'], (result) => {
+                    const prayer = result.currentPrayer || 'Adhan';
+                    adhanPrayerName.textContent = `${prayer} Time`;
+                    adhanNotification.classList.add('active');
+                    pauseIcon.style.display = 'block';
+                    playIcon.style.display = 'none';
+                    isAudioPlaying = true;
+                });
+            }
+        });
+    }
+
+    // Close adhan button - stops audio and hides banner
+    if (closeAdhan) {
+        closeAdhan.addEventListener('click', function() {
+            console.log('Close adhan button clicked');
+            // Stop audio
+            chrome.runtime.sendMessage({ action: 'stopAdhan' }, (resp) => {
+                if (resp && resp.stopped) {
+                    isAudioPlaying = false;
+                    adhanNotification.classList.remove('active');
+                    pauseIcon.style.display = 'block';
+                    playIcon.style.display = 'none';
+                    console.log('Adhan stopped and notification hidden');
+                }
+            });
+        });
+    }
 
     // Audio control toggle
     if (audioToggle) {
@@ -47,16 +89,56 @@ document.addEventListener('DOMContentLoaded', function() {
     // Listen for adhan start/end messages from background
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'adhanStarted') {
-            isAudioPlaying = true;
+            // Show banner and ensure audio is actually playing
             adhanPrayerName.textContent = `${message.prayer || 'Adhan'} Time`;
             adhanNotification.classList.add('active');
             pauseIcon.style.display = 'block';
             playIcon.style.display = 'none';
+            isAudioPlaying = true;
+            ensureAudioPlayback();
         } else if (message.action === 'adhanEnded') {
             isAudioPlaying = false;
             adhanNotification.classList.remove('active');
         }
     });
+
+    // Try to recover playback if the offscreen audio failed to start
+    function ensureAudioPlayback() {
+        // Query current audio state, and attempt a resume with limited retries
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        const check = () => {
+            chrome.runtime.sendMessage({ action: 'getAudioState' }, (resp) => {
+                const playing = resp && resp.isPlaying;
+                if (playing) {
+                    // Audio is playing; keep UI in pause state
+                    pauseIcon.style.display = 'block';
+                    playIcon.style.display = 'none';
+                    isAudioPlaying = true;
+                    return; // done
+                }
+                // Not playing — try resume if under attempts
+                if (attempts < maxAttempts) {
+                    attempts++;
+                    chrome.runtime.sendMessage({ action: 'resumeAdhan' }, (r) => {
+                        // Re-check after a short delay
+                        setTimeout(check, 400);
+                    });
+                } else {
+                    // Give up: keep banner, show play button for manual attempt
+                    isAudioPlaying = false;
+                    pauseIcon.style.display = 'none';
+                    playIcon.style.display = 'block';
+                    // Optional: provide subtle message
+                    const msgEl = document.querySelector('#adhanNotification .adhan-message');
+                    if (msgEl) msgEl.textContent = 'Adhan ready. Tap to play.';
+                }
+            });
+        };
+        // Initial check shortly after banner appears
+        setTimeout(check, 300);
+    }
 
     // Load stored data (location + today's timings) and render
     chrome.storage.local.get(['location', 'prayerTimes', 'date'], function(result) {
@@ -72,6 +154,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Load Hadith of the Day
     loadHadith();
+
+    // Play Adhan button
+    const playAdhanBtn = document.getElementById('playAdhanBtn');
+    if (playAdhanBtn) {
+        playAdhanBtn.addEventListener('click', function() {
+            console.log('Play Adhan button clicked');
+            // Send message to background script to play adhan
+            chrome.runtime.sendMessage({ action: 'testPlayAdhan', prayer: 'Test' }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error('Error sending play message:', chrome.runtime.lastError);
+                } else {
+                    console.log('Play adhan response:', response);
+                }
+            });
+        });
+    }
 
     manualBtn.addEventListener('click', function() {
         const city = cityInput.value.trim();
@@ -140,7 +238,11 @@ document.addEventListener('DOMContentLoaded', function() {
         renderView();
         startAutoUpdate();
         // Reschedule alarms with new timings
-        try { chrome.runtime.sendMessage({ action: 'reschedule' }); } catch (e) { /* noop */ }
+        chrome.runtime.sendMessage({ action: 'reschedule' }, (response) => {
+            if (chrome.runtime.lastError) {
+                console.log('Reschedule message error:', chrome.runtime.lastError.message);
+            }
+        });
     }
 
     function renderView() {
@@ -188,12 +290,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Past prayers section
-        html += `<div class="card" aria-label="Past prayers"><h4 style="margin:0 0 8px;">Already Passed</h4>`;
+        html += `<div class="card" aria-label="Past prayers"><h4 style="margin:8px 0 8px 0;">Already Passed</h4>`;
         if (past.length === 0) {
             html += `<div class="timeItem"><span class="name">None yet</span><span class="value">—</span></div>`;
         } else {
             past.forEach(item => {
-                html += `<div class="timeItem" role="listitem"><span class="name">${item.name}</span><span class="value">${item.time}</span></div>`;
+                html += `<div class="timeItem" role="listitem" style="margin:8px 0 8px 0;"><span class="name">${item.name}</span><span class="value">${item.time}</span></div>`;
             });
         }
         html += `</div>`;
@@ -212,10 +314,10 @@ document.addEventListener('DOMContentLoaded', function() {
         html += `</div>`;
 
         // Full list for clarity
-        html += `<div class="card" aria-label="Today's prayer times"><h4 style="margin:0 0 8px;">Today's Prayer Times</h4>`;
+        html += `<div class="card" aria-label="Today's prayer times"><h4>Today's Prayer Times</h4>`;
         prayersOrder.forEach(p => {
             if (timings[p]) {
-                html += `<div class="timeItem"><span class="name">${p}</span><span class="value">${timings[p]}</span></div>`;
+                html += `<div class="timeItem" style="margin:8px 0 8px 0;"><span class="name">${p}</span><span class="value">${timings[p]}</span></div>`;
             }
         });
         html += `</div>`;
@@ -247,28 +349,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const hadithContent = document.getElementById('hadithContent');
         const today = new Date().toDateString();
         // Local fallback Hadiths (short, widely cited). Used if network errors or API changes occur.
-        const fallbackHadiths = [
-            {
-                text: 'The most beloved deeds to Allah are those that are most consistent, even if small.',
-                source: 'Sahih al-Bukhari',
-                narrator: 'Aisha (ra)'
-            },
-            {
-                text: 'Indeed, actions are but by intentions, and every person will get the reward according to what he intended.',
-                source: 'Sahih al-Bukhari & Muslim',
-                narrator: 'Umar ibn al-Khattab (ra)'
-            },
-            {
-                text: 'The best of you are those who learn the Qur’an and teach it.',
-                source: 'Sahih al-Bukhari',
-                narrator: 'Uthman ibn Affan (ra)'
-            },
-            {
-                text: 'Make things easy, do not make them difficult; cheer the people up by conveying glad tidings to them and do not repulse them.',
-                source: 'Sahih al-Bukhari',
-                narrator: 'Anas ibn Malik (ra)'
-            }
-        ];
+        // const fallbackHadiths = [
+        //     {
+        //         text: 'The most beloved deeds to Allah are those that are most consistent, even if small.',
+        //         source: 'Sahih al-Bukhari',
+        //         narrator: 'Aisha (ra)'
+        //     },
+        //     {
+        //         text: 'Indeed, actions are but by intentions, and every person will get the reward according to what he intended.',
+        //         source: 'Sahih al-Bukhari & Muslim',
+        //         narrator: 'Umar ibn al-Khattab (ra)'
+        //     },
+        //     {
+        //         text: 'The best of you are those who learn the Qur’an and teach it.',
+        //         source: 'Sahih al-Bukhari',
+        //         narrator: 'Uthman ibn Affan (ra)'
+        //     },
+        //     {
+        //         text: 'Make things easy, do not make them difficult; cheer the people up by conveying glad tidings to them and do not repulse them.',
+        //         source: 'Sahih al-Bukhari',
+        //         narrator: 'Anas ibn Malik (ra)'
+        //     }
+        // ];
 
         chrome.storage.local.get(['hadith', 'hadithDate'], function(result) {
             if (result.hadith && result.hadithDate === today) {
@@ -286,20 +388,51 @@ document.addEventListener('DOMContentLoaded', function() {
             
             chrome.runtime.sendMessage({ action: 'fetchHadith', book: randomBook }, (resp) => {
                 if (!resp || !resp.success) {
-                    // console.warn('Hadith fetch via background failed:', resp?.error);
+                    console.warn('Hadith fetch via background failed:', resp?.error);
                     return useFallback();
                 }
                 const data = resp.data;
-                // hadith.gading.dev single hadith returns { data: { number, arab, id, ... } }
-                const h = data?.data;
-                if (!h) {
+                console.log('Hadith API response:', data);
+                
+                // hadith.gading.dev returns: { code, message, data: { name, id, available, requested, hadiths: [...] } }
+                const hadiths = data?.data?.hadiths;
+                if (!hadiths || hadiths.length === 0) {
                     console.warn('No hadith data in response');
                     return useFallback();
                 }
-                // Try to get English text; if not available, use Arab text as placeholder
-                const text = h?.arab || h?.text || 'Hadith text';
+                
+                // Get the first hadith from the array
+                const h = hadiths[0];
+                
+                console.log('Hadith object:', h);
+                console.log('Hadith contents:', h?.contents);
+                
+                // Get English text from contents array if available
+                let text = 'Hadith text not available';
+                if (h?.contents && Array.isArray(h.contents)) {
+                    const englishContent = h.contents.find(c => c.lang === 'en' || c.lang === 'english');
+                    const arabContent = h.contents.find(c => c.lang === 'ar' || c.lang === 'arab');
+                    
+                    console.log('English content found:', !!englishContent);
+                    console.log('Arabic content found:', !!arabContent);
+                    
+                    if (englishContent?.body) {
+                        text = englishContent.body;
+                        console.log('Using English text');
+                    } else if (arabContent?.body) {
+                        text = arabContent.body;
+                        console.log('Using Arabic text (English not available)');
+                    } else {
+                        text = h.arab || 'Hadith text';
+                        console.log('Using fallback text');
+                    }
+                } else {
+                    text = h?.english || h?.arab || 'Hadith text';
+                    console.log('No contents array, using direct properties');
+                }
+                
                 const source = data?.data?.name || randomBook.charAt(0).toUpperCase() + randomBook.slice(1);
-                const narrator = `Hadith ${h?.number || h?.id || ''}`;
+                const narrator = h?.number ? `Hadith #${h.number}` : 'Hadith';
                 
                 const hadith = { text, source, narrator };
                 chrome.storage.local.set({ hadith, hadithDate: today });
@@ -317,11 +450,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function displayHadith(hadith) {
-            if (hadith) {
+            if (!hadithContent) return;
+            
+            if (hadith && hadith.text) {
                 hadithContent.innerHTML = `
-                    <blockquote style="margin: 0; font-style: italic; color: #e2e8f0;">"${escapeHtml(hadith.text)}"</blockquote>
-                    <cite style="display: block; margin-top: 8px; font-size: 12px; color: #cbd5e1;">
-                        — ${escapeHtml(hadith.narrator)}, ${escapeHtml(hadith.source)}
+                    <blockquote style="margin: 0; padding: 10px; font-style: italic; color: #e2e8f0; line-height: 1.6; border-left: 3px solid var(--gold); background: rgba(255,255,255,0.03); border-radius: 8px;">
+                        "${escapeHtml(hadith.text)}"
+                    </blockquote>
+                    <cite style="display: block; margin-top: 10px; font-size: 12px; color: #cbd5e1; text-align: right;">
+                        — ${escapeHtml(hadith.narrator || 'Hadith')}, ${escapeHtml(hadith.source || 'Collection')}
                     </cite>
                 `;
             } else {

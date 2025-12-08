@@ -3,6 +3,30 @@ document.addEventListener('DOMContentLoaded', function() {
     const prayers = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'];
     const playAudioCheckbox = document.getElementById('playAudio');
     const hadithApiKeyInput = document.getElementById('hadithApiKey');
+    const testAudioBtn = document.getElementById('testAudio');
+
+    // Test audio button
+    if (testAudioBtn) {
+        testAudioBtn.addEventListener('click', function() {
+            testAudioBtn.textContent = 'Playing...';
+            testAudioBtn.disabled = true;
+            
+            chrome.runtime.sendMessage({ action: 'playAdhan', prayer: 'Test' }, (response) => {
+                setTimeout(() => {
+                    testAudioBtn.textContent = 'Test Adhan Audio';
+                    testAudioBtn.disabled = false;
+                }, 2000);
+                
+                if (chrome.runtime.lastError) {
+                    alert('Error testing audio: ' + chrome.runtime.lastError.message);
+                } else if (response && response.error) {
+                    alert('Audio test failed: ' + response.error);
+                } else {
+                    console.log('Audio test initiated successfully');
+                }
+            });
+        });
+    }
 
     // Load settings
     chrome.storage.local.get(['enabledPrayers', 'playAudio', 'hadithApiKey'], function(result) {
